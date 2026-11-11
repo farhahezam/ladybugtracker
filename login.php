@@ -1,45 +1,103 @@
+
 <?php
-include 'includes/db.php';
-include 'includes/header.php';
-$error = '';
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email = trim($_POST['email']);
-    $password = $_POST['password'];
-    $stmt = $mysqli->prepare('SELECT UserID,Name,Email,Password,Role FROM users WHERE Email=?');
-    $stmt->bind_param('s',$email);
-    $stmt->execute();
-    $res = $stmt->get_result();
-    if ($row = $res->fetch_assoc()) {
-        if ($password === $row['Password']) {
-            if ($row['Role'] === 'admin') {
-                $_SESSION['admin'] = array('id'=>$row['UserID'],'name'=>$row['Name'],'email'=>$row['Email']);
-                header('Location: admin/dashboard.php'); exit;
-            } else {
-                $_SESSION['user'] = array('id'=>$row['UserID'],'name'=>$row['Name'],'email'=>$row['Email']);
-                header('Location: user/dashboard.php'); exit;
-            }
-        } else {
-            $error = 'Invalid credentials';
-        }
-    } else {
-        $error = 'Invalid credentials';
-    }
+require_once "includes/functions.php";
+
+if (current_user()) {
+    redirect("index.php");
 }
+
+$error = "";
+
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    verify_csrf();
+
+    $identity = trim($_POST["identity"] ?? "");
+    $password = $_POST["password"] ?? "";
+
+    $stmt = $pdo->prepare("
+        SELECT id, username, email, password_hash
+        FROM users
+        WHERE username = :username OR email = :email
+        LIMIT 1
+    ");
+
+    $stmt->execute([
+        "username" => $identity,
+        "email" => $identity
+    ]);
+
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($user && password_verify($password, $user["password_hash"])) {
+        session_regenerate_id(true);
+
+        $_SESSION["user_id"] = (int) $user["id"];
+        unset($_SESSION["csrf_token"]);
+
+        log_activity("User Login", "User logged in.");
+
+        redirect("index.php");
+    }
+
+    $error = "Invalid username/email or password.";
+}
+
+require_once "includes/header.php";
 ?>
-<div class="row justify-content-center">
-  <div class="col-md-6">
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <h2 class="mb-3">Login</h2>
-        <?php if ($error) echo '<div class="alert alert-danger">'.htmlspecialchars($error).'</div>'; ?>
-        <form method="post">
-          <div class="mb-3"><label class="form-label">Email</label><input class="form-control" name="email" type="email" required></div>
-          <div class="mb-3"><label class="form-label">Password</label><input class="form-control" name="password" type="password" required></div>
-          <button class="btn btn-primary" type="submit">Login</button>
-          <a class="btn btn-link" href="register.php">Register</a>
-        </form>
-      </div>
+
+<div class="page-heading">
+    <div>
+        <h1>Welcome Back</h1>
+        <p>Log in to access your LadyBug Tracker workspace.</p>
     </div>
-  </div>
 </div>
-<?php include 'includes/footer.php'; ?>
+
+<div class="form-card">
+    <div class="form-card-heading">
+        <div class="form-heading-icon">
+            <i class="bi bi-person-lock"></i>
+        </div>
+        <div>
+            <h2>Account Login</h2>
+            <p>Enter your account details below.</p>
+        </div>
+    </div>
+
+    <?php if ($error): ?>
+        <div class="alert alert-error">
+            <?= e($error) ?>
+        </div>
+    <?php endif; ?>
+
+    <form method="POST">
+        <?= csrf_field() ?>
+
+        <div class="form-group">
+            <label>Username or Email</label>
+            <input
+                type="text"
+                name="identity"
+                value="<?= e($_POST["identity"] ?? "") ?>"
+                required
+            >
+        </div>
+
+        <div class="form-group">
+            <label>Password</label>
+            <input
+                type="password"
+                name="password"
+                required
+            >
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-box-arrow-in-right"></i>
+                Login
+            </button>
+        </div>
+    </form>
+</div>
+
+<?php require_once "includes/footer.php"; ?>
