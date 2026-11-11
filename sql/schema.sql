@@ -1,0 +1,25 @@
+CREATE DATABASE IF NOT EXISTS cms_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE cms_db;
+
+CREATE TABLE IF NOT EXISTS users (
+  UserID INT AUTO_INCREMENT PRIMARY KEY,
+  Name VARCHAR(100) NOT NULL,
+  Email VARCHAR(100) NOT NULL UNIQUE,
+  Password VARCHAR(255) NOT NULL,
+  Role ENUM('user','admin') NOT NULL DEFAULT 'user'
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS complaints (
+  ComplaintID INT AUTO_INCREMENT PRIMARY KEY,
+  UserID INT NOT NULL,
+  Title VARCHAR(150) NOT NULL,
+  Description TEXT NOT NULL,
+  Category VARCHAR(50) NOT NULL,
+  Status ENUM('Pending','In-Progress','Resolved') NOT NULL DEFAULT 'Pending',
+  Reply TEXT,
+  Date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (UserID) REFERENCES users(UserID) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+INSERT INTO users (Name,Email,Password,Role) VALUES ('Admin','admin@cms.local','admin@123','admin')
+ON DUPLICATE KEY UPDATE Email=Email;
